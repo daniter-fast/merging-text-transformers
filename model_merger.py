@@ -9,13 +9,51 @@ from collections import defaultdict
 from copy import deepcopy
 from torch import nn
 
-from torchnlp.utils import lengths_to_mask
 from graphs.base_graph import NodeType
 from metric_calculators import CovarianceMetric, MeanMetric
 from matching_functions import match_tensors_permute
 from matching_functions import compute_correlation
 from utils import get_merging_fn, contains_name
 
+
+def lengths_to_mask(*lengths, **kwargs):
+    """ Given a list of lengths, create a batch mask.
+
+    Example:
+        >>> lengths_to_mask([1, 2, 3])
+        tensor([[ True, False, False],
+                [ True,  True, False],
+                [ True,  True,  True]])
+        >>> lengths_to_mask([1, 2, 2], [1, 2, 2])
+        tensor([[[ True, False],
+                 [False, False]],
+        <BLANKLINE>
+                [[ True,  True],
+                 [ True,  True]],
+        <BLANKLINE>
+                [[ True,  True],
+                 [ True,  True]]])
+
+    Args:
+        *lengths (list of int or torch.Tensor)
+        **kwargs: Keyword arguments passed to ``torch.zeros`` upon initially creating the returned
+          tensor.
+
+    Returns:
+        torch.BoolTensor
+    """
+    # Squeeze to deal with random additional dimensions
+    lengths = [l.squeeze().tolist() if torch.is_tensor(l) else l for l in lengths]
+
+    # For cases where length is a scalar, this needs to convert it to a list.
+    lengths = [l if isinstance(l, list) else [l] for l in lengths]
+    assert all(len(l) == len(lengths[0]) for l in lengths)
+    batch_size = len(lengths[0])
+    other_dimensions = tuple([int(max(l)) for l in lengths])
+    mask = torch.zeros(batch_size, *other_dimensions, **kwargs)
+    for i, length in enumerate(zip(*tuple(lengths))):
+        mask[i][[slice(int(l)) for l in length]].fill_(1)
+    return mask.bool()
 
 class MergeHandler:
     def __init__(self, graph, merge, unmerge, orig):
