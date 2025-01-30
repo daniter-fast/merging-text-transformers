@@ -11,11 +11,11 @@ class TransformerEncoderGraph(BIGGraph):
     
     def __init__(self, model,
                  modules,
-                 layer_name='', # for transformer
-                 enc_prefix='decoder',
+                 layer_name='layers', # for transformer
+                 enc_prefix='',
                  merge_type='all',
-                 num_layers=12,
-                 num_heads=8,
+                 num_layers=30, #smollm
+                 num_heads=9, #smollm 
                  qk=False,
                  name='llama',
                  classifier=False):
@@ -35,142 +35,47 @@ class TransformerEncoderGraph(BIGGraph):
     def add_layerblock_nodes(self, name_prefix, input_node, merge_type):
         # first half
         modules = self.modules
+
+        # LayerNorm
+        input_node = self.add_nodes_from_sequence(name_prefix, [modules['emb_ln']], input_node)
+        input_node = self.add_nodes_from_sequence(name_prefix, [NodeType.POSTFIX], input_node)
+
         # do attention block here
         residual = input_node
+
+
+        # attention
         value_node = self.add_nodes_from_sequence(name_prefix, [modules['v']], residual)
-        if self.qk:
-            key_node = self.add_nodes_from_sequence(name_prefix, [modules['k'], NodeType.POSTFIX], residual)
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['q'], NodeType.POSTFIX, NodeType.SUM], residual)
-        else:
-            key_node = self.add_nodes_from_sequence(name_prefix, [modules['k']], residual)
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['q'], NodeType.SUM], residual)
+        key_node = self.add_nodes_from_sequence(name_prefix, [modules['k'], NodeType.POSTFIX], residual)
+        input_node = self.add_nodes_from_sequence(name_prefix, [modules['q'], NodeType.POSTFIX, NodeType.SUM], residual)
         self.add_directed_edge(key_node, input_node) # add key to "SUM" - it is really just a product but same handler
         input_node = self.add_nodes_from_sequence(name_prefix, [NodeType.SUM], input_node) #sum (mult)node to outproj
         self.add_directed_edge(value_node, input_node) #value node to sum (mult)
+
+        #todo: add rotary embeddings and output proj
+        # todo: rename qkv so it's readable in the graph
+
+        if True:
+            return input_node
         
-        if merge_type == 'ff_only':
-            # add self attn out proj to dot prod, layer norm, sum residual
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                    [modules['lin_attn'], NodeType.SUM], 
-                                                    input_node)
-            # add & norm
-            self.add_directed_edge(residual, input_node)
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['attn_ln']], input_node=input_node)
+        # add self attn out proj to dot prod, layer norm, sum residual
+        # get intermeds between attn and self attn out proj
+        # get first residual vector from after self attn layer norm
+        input_node = self.add_nodes_from_sequence(name_prefix, 
+                                                [NodeType.PREFIX, modules['lin_attn'], NodeType.SUM], 
+                                                input_node) 
+        # add & norm
+        self.add_directed_edge(residual, input_node)
+        input_node = self.add_nodes_from_sequence(name_prefix, [modules['attn_ln'], NodeType.POSTFIX], input_node=input_node)
 
-            # do second half with residual too
-            residual = input_node
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                  [modules['fc1'], NodeType.PREFIX, modules['fc2'], NodeType.SUM], 
-                                                  input_node=input_node)
-            self.add_directed_edge(residual, input_node)
+        # do second half with residual too
+        residual = input_node
+        input_node = self.add_nodes_from_sequence(name_prefix, 
+                                                [modules['fc1'], NodeType.PREFIX, modules['fc2'], NodeType.SUM], 
+                                                input_node=input_node)
+        self.add_directed_edge(residual, input_node)
 
-        if merge_type == 'res_only':
-            # add self attn out proj to dot prod, layer norm, sum residual
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                    [modules['lin_attn'], NodeType.SUM], 
-                                                    input_node)
-            # add & norm
-            self.add_directed_edge(residual, input_node)
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['attn_ln'], NodeType.POSTFIX], input_node=input_node)
-
-            # do second half with residual too
-            residual = input_node
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                  [modules['fc1'], modules['fc2'], NodeType.SUM], 
-                                                  input_node=input_node)
-            self.add_directed_edge(residual, input_node)
-
-        elif merge_type == 'ff+res':
-            # add self attn out proj to dot prod, layer norm, sum residual
-            # get first residual vector from after self attn layer norm
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                    [modules['lin_attn'], NodeType.SUM], 
-                                                    input_node) 
-            # add & norm
-            self.add_directed_edge(residual, input_node)
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['attn_ln'], NodeType.POSTFIX], input_node=input_node)
-
-            # do second half with residual too
-            residual = input_node
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                  [modules['fc1'], NodeType.PREFIX, modules['fc2'], NodeType.SUM], 
-                                                  input_node=input_node)
-            self.add_directed_edge(residual, input_node)
-
-        elif merge_type == 'ff+attn':
-            # add self attn out proj to dot prod, layer norm, sum residual
-            # get intermeds between attn and self attn out proj
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                    [NodeType.PREFIX, modules['lin_attn'], NodeType.SUM], 
-                                                    input_node) 
-            # add & norm
-            self.add_directed_edge(residual, input_node)
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['attn_ln']], input_node=input_node)
-
-            # do second half with residual too
-            residual = input_node
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                  [modules['fc1'], NodeType.PREFIX, modules['fc2'], NodeType.SUM], 
-                                                  input_node=input_node)
-            self.add_directed_edge(residual, input_node)
-
-        elif merge_type == 'attn_only':
-            # add self attn out proj to dot prod, layer norm, sum residual
-            # get intermeds between attn and self attn out proj
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                    [NodeType.PREFIX, modules['lin_attn'], NodeType.SUM], 
-                                                    input_node) 
-            # add & norm
-            self.add_directed_edge(residual, input_node)
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['attn_ln']], input_node=input_node)
-
-            # do second half with residual too
-            residual = input_node
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                  [modules['fc1'], modules['fc2'], NodeType.SUM], 
-                                                  input_node=input_node)
-            self.add_directed_edge(residual, input_node)
-
-        elif merge_type == 'res+attn':
-            # add self attn out proj to dot prod, layer norm, sum residual
-            # get intermeds between attn and self attn out proj
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                    [NodeType.PREFIX, modules['lin_attn'], NodeType.SUM], 
-                                                    input_node) 
-            # add & norm
-            self.add_directed_edge(residual, input_node)
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['attn_ln'], NodeType.POSTFIX], input_node=input_node)
-
-            # do second half with residual too
-            residual = input_node
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                  [modules['fc1'], modules['fc2'], NodeType.SUM], 
-                                                  input_node=input_node)
-            self.add_directed_edge(residual, input_node)
-
-
-        elif merge_type == 'all':
-            # add self attn out proj to dot prod, layer norm, sum residual
-            # get intermeds between attn and self attn out proj
-            # get first residual vector from after self attn layer norm
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                    [NodeType.PREFIX, modules['lin_attn'], NodeType.SUM], 
-                                                    input_node) 
-            # add & norm
-            self.add_directed_edge(residual, input_node)
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['attn_ln'], NodeType.POSTFIX], input_node=input_node)
-
-            # do second half with residual too
-            residual = input_node
-            input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                  [modules['fc1'], NodeType.PREFIX, modules['fc2'], NodeType.SUM], 
-                                                  input_node=input_node)
-            self.add_directed_edge(residual, input_node)
-
-        if merge_type in ['all', 'ff+res', 'res_only', 'res+attn']:
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['final_ln'], NodeType.POSTFIX], input_node=input_node)
-        else:
-            input_node = self.add_nodes_from_sequence(name_prefix, [modules['final_ln']], input_node=input_node)
+        input_node = self.add_nodes_from_sequence(name_prefix, [modules['final_ln'], NodeType.POSTFIX], input_node=input_node)
         return input_node
 
     def add_layer_nodes(self, layer_prefix, input_node, merge_type):
@@ -192,15 +97,18 @@ class TransformerEncoderGraph(BIGGraph):
                                     param_name=f'{self.enc_prefix}.{emb_name}.weight'.strip('.'))
         self.add_directed_edge(input_node, emb_node)
 
-        # removing emb_pos node for now...
-        input_node = self.add_nodes_from_sequence(self.enc_prefix, [modules['emb_ln']], emb_node) 
-     
-        if self.merge_type in ['all', 'ff+res', 'res_only']:
-            #adding postfix to emb_ln, before xformer layers
+        # after embedding, repeat LlamaDecoderLayer
+        input_node = self.add_layer_nodes(f'{self.layer_name}', emb_node, self.merge_type)
+
+        if False:
+            # This is done per layer
+            input_node = self.add_nodes_from_sequence(self.enc_prefix, [modules['emb_ln']], emb_node)
             input_node = self.add_nodes_from_sequence(self.enc_prefix, [NodeType.POSTFIX], input_node)
 
-        # layernorm_embedding -> xformer layers
-        input_node = self.add_layer_nodes(f'{self.layer_name}', input_node, self.merge_type)
+        if True:
+            return self
+        
+        # todo: sort out output layer
                 
         # xformer layers -> dense -> layernorm -> output
         if self.name == 'bert' and self.classifier == False:

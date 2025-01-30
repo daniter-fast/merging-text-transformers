@@ -114,9 +114,12 @@ class BIGGraph(ABC):
     def get_node_str(self, node_name):
         """ Get node type name. """
         info = self.get_node_info(node_name)
+        layer_name = info['layer']
+        if layer_name and "." in layer_name:
+            layer_name = layer_name.split('.')[-1]
         
         if info['type'] == NodeType.MODULE:
-            return self.get_module_from_node(node_name).__class__.__name__
+            return f"{layer_name} ({self.get_module_from_node(node_name).__class__.__name__})"
         else:
             return info['type'].name
     
@@ -192,7 +195,7 @@ class BIGGraph(ABC):
             if info['type'] in (NodeType.PREFIX, NodeType.POSTFIX):
                 print(f'{node:3} in={len(self.preds(node))}, out={len(self.succs(node))}')
 
-    def draw(self, nodes=None, save_path=None):
+    def draw(self, nodes=None, save_path=None, figsize=(120, 160)):
         """
         Visualize DAG. By default all nodes are colored gray, but if parts of module have already been 
         transformed, they will be colored according to the kinds of transformations applied on the nodes.
@@ -225,7 +228,7 @@ class BIGGraph(ABC):
             colors[k] = tuple(map(lambda x: x / 255., v))
         
         node_color = [colors[(node in self.merged, node in self.unmerged)] for node in G]
-        plt.figure(figsize=(120, 160))
+        plt.figure(figsize=figsize)
         nx.draw_networkx(G, pos=pos, labels=labels, node_size=node_size, node_color=node_color)
         if save_path is not None:
             plt.savefig(save_path)
