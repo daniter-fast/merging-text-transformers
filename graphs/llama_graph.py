@@ -36,6 +36,8 @@ class TransformerEncoderGraph(BIGGraph):
         # first half
         modules = self.modules
 
+        emb_before_ln = input_node
+
         # LayerNorm
         input_node = self.add_nodes_from_sequence(name_prefix, [modules['emb_ln']], input_node)
         input_node = self.add_nodes_from_sequence(name_prefix, [NodeType.POSTFIX], input_node)
@@ -43,40 +45,37 @@ class TransformerEncoderGraph(BIGGraph):
         # do attention block here
         residual = input_node
 
-
         # attention
-        value_node = self.add_nodes_from_sequence(name_prefix, [modules['v']], residual)
+        value_node = self.add_nodes_from_sequence(name_prefix, [modules['v'], NodeType.POSTFIX], residual)
         key_node = self.add_nodes_from_sequence(name_prefix, [modules['k'], NodeType.POSTFIX], residual)
         input_node = self.add_nodes_from_sequence(name_prefix, [modules['q'], NodeType.POSTFIX, NodeType.SUM], residual)
         self.add_directed_edge(key_node, input_node) # add key to "SUM" - it is really just a product but same handler
         input_node = self.add_nodes_from_sequence(name_prefix, [NodeType.SUM], input_node) #sum (mult)node to outproj
         self.add_directed_edge(value_node, input_node) #value node to sum (mult)
 
-        #todo: add rotary embeddings and output proj
-        # todo: rename qkv so it's readable in the graph
-
-        if True:
-            return input_node
-        
         # add self attn out proj to dot prod, layer norm, sum residual
         # get intermeds between attn and self attn out proj
         # get first residual vector from after self attn layer norm
         input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                [NodeType.PREFIX, modules['lin_attn'], NodeType.SUM], 
+                                                [NodeType.PREFIX, modules['attn_o'], NodeType.SUM], 
                                                 input_node) 
-        # add & norm
-        self.add_directed_edge(residual, input_node)
-        input_node = self.add_nodes_from_sequence(name_prefix, [modules['attn_ln'], NodeType.POSTFIX], input_node=input_node)
+        self.add_directed_edge(emb_before_ln, input_node)
 
-        # do second half with residual too
-        residual = input_node
-        input_node = self.add_nodes_from_sequence(name_prefix, 
-                                                [modules['fc1'], NodeType.PREFIX, modules['fc2'], NodeType.SUM], 
-                                                input_node=input_node)
-        self.add_directed_edge(residual, input_node)
+        normed_post_attn = self.add_nodes_from_sequence(name_prefix, [modules['post_attn_norm'], NodeType.POSTFIX], 
+                                                  input_node=input_node)
 
-        input_node = self.add_nodes_from_sequence(name_prefix, [modules['final_ln'], NodeType.POSTFIX], input_node=input_node)
-        return input_node
+
+        # Note rotary embeddings are skipped. Since they don't have weights, it seems the aren't required.
+        # Not sure if this is correct. Consider adding Rotary back in.
+
+        # MLP
+        up_proj = self.add_nodes_from_sequence(name_prefix, [modules['up_proj'], NodeType.POSTFIX], normed_post_attn)
+        gate_proj = self.add_nodes_from_sequence(name_prefix, [modules['gate_proj'], NodeType.POSTFIX, NodeType.SUM], normed_post_attn)
+        self.add_directed_edge(up_proj, gate_proj)
+        mlp_down = self.add_nodes_from_sequence(name_prefix, [modules['silu'], modules['down_proj'], NodeType.POSTFIX, NodeType.SUM], input_node=gate_proj)
+        self.add_directed_edge(input_node, mlp_down)
+
+        return mlp_down
 
     def add_layer_nodes(self, layer_prefix, input_node, merge_type):
         source_node = input_node
@@ -99,11 +98,6 @@ class TransformerEncoderGraph(BIGGraph):
 
         # after embedding, repeat LlamaDecoderLayer
         input_node = self.add_layer_nodes(f'{self.layer_name}', emb_node, self.merge_type)
-
-        if False:
-            # This is done per layer
-            input_node = self.add_nodes_from_sequence(self.enc_prefix, [modules['emb_ln']], emb_node)
-            input_node = self.add_nodes_from_sequence(self.enc_prefix, [NodeType.POSTFIX], input_node)
 
         if True:
             return self
