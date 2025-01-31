@@ -39,7 +39,7 @@ if __name__ == '__main__':
     model_name_list = ["HuggingFaceTB/SmolLM-135M-Instruct", "HuggingFaceTB/SmolLM-135M"]
     graph1, graph2 = make_graphified_models(model_name_list)
 
-    merge = ModelMerge(graph1, graph2)
+    merge = ModelMerge(graph1, graph2, device="cpu")
 
     num_test_ex = 1
     input_ids = torch.randint(0, 100, (num_test_ex, 10))
