@@ -133,6 +133,11 @@ class ModelMerge(nn.Module):
         pad_len = input.shape[1]
         bsz = input.shape[0]
 
+        print("Intermediate keys")
+        for g_idx in range(len(self.graphs)):
+            print(intermediates[g_idx].keys())
+        print("Intermediate keys END")
+
         for g_idx in range(len(self.graphs)):
             for node in list(intermediates[0].keys()):
                 # if this is the final node with cls vectors only.
@@ -515,7 +520,8 @@ class ModelMerge(nn.Module):
         global_res_merge= None
         global_res_unmerge = None
 
-        special_cases_names = ['final_ln', 'attn_ln', 'emb_ln', 'q', 'k']
+        special_cases_names = []#['final_ln', 'attn_ln', 'emb_ln', 'q', 'k']
+        # daniter: todo: why are these special cases? Go back and fix this.
         special_cases_nodes = [self.graphs[0].modules[name] for name in special_cases_names]
         qk_nodes = [self.graphs[0].modules[name] for name in ['q', 'k']]
 

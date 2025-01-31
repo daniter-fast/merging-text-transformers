@@ -36,6 +36,7 @@ class FeatureReshapeHandler:
             'AvgPool2d': self.handle_conv2d,
             'SpaceInterceptor': self.handle_conv2d,
             'Identity': self.handle_linear,
+            'LlamaRMSNorm': self.handle_linear,
             
         }[class_name]
         self.info = info
