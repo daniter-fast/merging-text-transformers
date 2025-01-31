@@ -58,7 +58,13 @@ class CovarianceMetric(MetricCalculator):
             # this is equivalent to E_ab from git rebasin
             cov = self.outer #* scaling_factor
         else:
+            # print number of positive values
+            print("Daniter: Number of elements: ", self.outer.numel())
+            print("Daniter: Number of negative values outer: ", (self.outer < 0).sum().item())
+            print("Daniter: Number of negative values mean: ", (torch.outer(self.mean, self.mean) < 0).sum().item())
+            
             cov = self.outer - torch.outer(self.mean, self.mean) 
+            print("Daniter: Number of negative values cov: ", (cov < 0).sum().item())
         if scale_cov:
             cov *= 1.0 / self.bsz
         if pca:

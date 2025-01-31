@@ -133,10 +133,11 @@ class ModelMerge(nn.Module):
         pad_len = input.shape[1]
         bsz = input.shape[0]
 
-        print("Intermediate keys")
-        for g_idx in range(len(self.graphs)):
-            print(intermediates[g_idx].keys())
-        print("Intermediate keys END")
+        if False: # printing intermediate keys
+            print("Intermediate keys")
+            for g_idx in range(len(self.graphs)):
+                print(intermediates[g_idx].keys())
+            print("Intermediate keys END")
 
         for g_idx in range(len(self.graphs)):
             for node in list(intermediates[0].keys()):
@@ -959,7 +960,8 @@ class ModelMerge(nn.Module):
             _, vars = self.compute_metrics(dataloader, 
                                 metric_classes=metric_classes, 
                                 sentence_level=sentence_level,
-                                special_toks=special_toks)
+                                special_toks=special_toks,
+                                print_featnorms=True)
 
         _, _, cost_dict = self.compute_transformations(transform_fn, reduce_ratio=1 - 1. / len(self.graphs),
                                     permute_heads=permute_heads,
