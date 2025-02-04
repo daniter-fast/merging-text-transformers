@@ -559,12 +559,12 @@ class ModelMerge(nn.Module):
 
         last_node = nodes[-1]
         for node in tqdm(nodes, desc="Computing transformations: "):
-            print("Daniter: Main loop processingnode: ", node)
+            print("Daniter: Main loop processing node: ", node)
             prev_node_layer = self.graphs[0].get_node_info(node-1)['layer']
             # skip metrics associated with residuals and qk if qk is true
             correlation_matrix = None
-            print("Daniter: correlation keys: ", corrs.keys())
             if prev_node_layer == None or not contains_name(prev_node_layer,special_cases_nodes):
+                print(f"Daniter: node: {node} in case 1")
                 if node in corrs:
                     correlation_matrix = corrs[node]
 
@@ -626,11 +626,13 @@ class ModelMerge(nn.Module):
                     self.unmerges[node] = unmerge.chunk(len(self.graphs), dim=0)
             
             elif contains_name(prev_node_layer, qk_nodes):
+                print(f"Daniter: node: {node} in case 2 - skipping")
                 continue
                 # continuing because this is already handled in attention block
 
             # handle metrics associated with residuals here, other special cases
             else:
+                print(f"Daniter: node: {node} in case 3 - residual")
                 info = self.graphs[0].get_node_info(node)
                 print('res')
                 print(info)
@@ -691,17 +693,24 @@ class ModelMerge(nn.Module):
         qk_nodes = [self.graphs[0].modules[name] for name in ['q', 'k']]
 
         emb_suff_0 = self.graphs[0].modules['emb']
-        emb_copy_0 = self.graphs[0].get_module(f'{self.graphs[0].enc_prefix}.{emb_suff_0}').weight.data
+        prefix = f"{self.graphs[0].enc_prefix}"
+        if prefix:
+            prefix += "." # only add period if prefix is not empty
+        emb_copy_0 = self.graphs[0].get_module(f'{prefix}{emb_suff_0}').weight.data
         emb_copy_0 = torch.clone(emb_copy_0)
 
         emb_suff_1 = self.graphs[1].modules['emb']
-        emb_copy_1= self.graphs[1].get_module(f'{self.graphs[1].enc_prefix}.{emb_suff_1}').weight.data
+        prefix = f"{self.graphs[1].enc_prefix}"
+        if prefix:
+            prefix += "." # only add period if prefix is not empty
+        emb_copy_1= self.graphs[1].get_module(f'{prefix}{emb_suff_1}').weight.data
         emb_copy_1 = torch.clone(emb_copy_1)
         
         final_merger = None
         graph_device = emb_copy_0.device
 
         for node in self.merges:
+            print("Daniter: Merging node: ", node)
             merges = self.merges[node]
             unmerges = self.unmerges[node]
             count = 0
@@ -719,6 +728,7 @@ class ModelMerge(nn.Module):
                     # check if q,k junction or v matrix
                     for sum_pred in sum_preds:
                         info = merger.graph.get_node_info(sum_pred)
+                        print("Daniter: q,k,v merging info: ", info)
                         if info['type'] == NodeType.SUM:
                             if qk_flag == False:
                                 second_sum_preds = merger.graph.preds(sum_pred)

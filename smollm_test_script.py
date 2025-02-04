@@ -39,6 +39,9 @@ if __name__ == '__main__':
     model_name_list = ["HuggingFaceTB/SmolLM-135M-Instruct", "HuggingFaceTB/SmolLM-135M"]
     graph1, graph2 = make_graphified_models(model_name_list)
 
+    if False:
+        graph1.draw(save_path="/tmp/graph1.png", figsize=(60, 80))
+
     merge = ModelMerge(graph1, graph2, device="cpu")
 
     num_test_ex = 1
@@ -53,3 +56,4 @@ if __name__ == '__main__':
     merge.transform(model3, dataloader, transform_fn=match_tensors_permute, special_toks=True, res_type='first')
     # metric calculation is broken. Need to read paper.
     # TODO: using res_type='first' but should explore all and sep. Not sure what sep does.
+    # TODO: We need to change apply_transformation_custom() to handle up and gate proj in MLP

@@ -16,7 +16,7 @@ class TransformerEncoderGraph(BIGGraph):
                  merge_type='all',
                  num_layers=30, #smollm
                  num_heads=9, #smollm 
-                 qk=False,
+                 qk=True,
                  name='llama',
                  classifier=False):
         super().__init__(model)
@@ -69,10 +69,11 @@ class TransformerEncoderGraph(BIGGraph):
         # Not sure if this is correct. Consider adding Rotary back in.
 
         # MLP
-        up_proj = self.add_nodes_from_sequence(name_prefix, [modules['up_proj'], NodeType.POSTFIX], normed_post_attn)
-        gate_proj = self.add_nodes_from_sequence(name_prefix, [modules['gate_proj'], NodeType.POSTFIX, NodeType.SUM], normed_post_attn)
+        up_proj = self.add_nodes_from_sequence(name_prefix, [modules['up_proj']], normed_post_attn) # removed postfix
+        gate_proj = self.add_nodes_from_sequence(name_prefix, [modules['gate_proj'], NodeType.SUM], normed_post_attn) # removed postfix
         self.add_directed_edge(up_proj, gate_proj)
-        mlp_down = self.add_nodes_from_sequence(name_prefix, [modules['silu'], modules['down_proj'], NodeType.POSTFIX, NodeType.SUM], input_node=gate_proj)
+        # removed Silu and use prefix instead of postfix
+        mlp_down = self.add_nodes_from_sequence(name_prefix, [NodeType.PREFIX, modules['down_proj'],  NodeType.SUM], input_node=gate_proj) 
         self.add_directed_edge(input_node, mlp_down)
 
         return mlp_down
