@@ -46,7 +46,7 @@ class TransformerEncoderGraph(BIGGraph):
         residual = input_node
 
         # attention
-        value_node = self.add_nodes_from_sequence(name_prefix, [modules['v'], NodeType.POSTFIX], residual)
+        value_node = self.add_nodes_from_sequence(name_prefix, [modules['v']], residual) # NodeType.POSTFIX is being removed because P_{MHA} is shared by all attn weights anyway
         key_node = self.add_nodes_from_sequence(name_prefix, [modules['k'], NodeType.POSTFIX], residual)
         input_node = self.add_nodes_from_sequence(name_prefix, [modules['q'], NodeType.POSTFIX, NodeType.SUM], residual)
         self.add_directed_edge(key_node, input_node) # add key to "SUM" - it is really just a product but same handler

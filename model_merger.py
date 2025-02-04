@@ -220,7 +220,7 @@ class ModelMerge(nn.Module):
                     if type(numel_local) != int:
                         numel_local = numel_local.item()
                     if special_toks == False:
-                        numel_local =- 2*x.shape[0] # num tokens - BOS/EOS toks 
+                        numel_local -= (2*x.shape[0]) # num tokens - BOS/EOS toks 
                 numel += numel_local
                     
                 # get intermediates and remove padding idxs 
@@ -480,6 +480,8 @@ class ModelMerge(nn.Module):
     def compute_metric_corrs(self, nodes, res='first', no_corr=False, qk=False):
         corrs = {}
         resnodes, non_resnodes = self.separate_res_nodes(nodes)
+        print("Daniter: resnodes: ", resnodes)
+        print("Daniter: non_resnodes: ", non_resnodes)
         
         for node in tqdm(non_resnodes):
             corrs[node] = self.cov_to_corr(self.metrics[node]['covariance'], no_corr)
@@ -521,7 +523,7 @@ class ModelMerge(nn.Module):
         global_res_merge= None
         global_res_unmerge = None
 
-        special_cases_names = []#['final_ln', 'attn_ln', 'emb_ln', 'q', 'k']
+        special_cases_names = ['final_norm', 'post_attn_norm', 'emb_ln', 'q', 'k']
         # daniter: todo: why are these special cases? Go back and fix this.
         special_cases_nodes = [self.graphs[0].modules[name] for name in special_cases_names]
         qk_nodes = [self.graphs[0].modules[name] for name in ['q', 'k']]
@@ -537,12 +539,14 @@ class ModelMerge(nn.Module):
             corrs = self.compute_corrs(nodes, feats_0, feats_1, res=res)
         else:
             nodes = list(self.metrics.keys())
+            print("Daniter: nodes: ", nodes)
             qk_flag = False
             if self.graphs[0].qk == True:
                 qk_flag = True
                 for i in range(self.graphs[0].num_layers):
                     nodes.remove(f'qk{i}')
             nodes.sort()
+            print("Daniter: nodes filtered: ", nodes)
             print('computing corrs')
             corrs = self.compute_metric_corrs(nodes, res=res, no_corr=no_corr, qk=qk_flag)
 
@@ -555,19 +559,22 @@ class ModelMerge(nn.Module):
 
         last_node = nodes[-1]
         for node in tqdm(nodes, desc="Computing transformations: "):
+            print("Daniter: Main loop processingnode: ", node)
             prev_node_layer = self.graphs[0].get_node_info(node-1)['layer']
             # skip metrics associated with residuals and qk if qk is true
             correlation_matrix = None
+            print("Daniter: correlation keys: ", corrs.keys())
             if prev_node_layer == None or not contains_name(prev_node_layer,special_cases_nodes):
                 if node in corrs:
                     correlation_matrix = corrs[node]
 
                 info = self.graphs[0].get_node_info(node)
-                print(info)
+                print("Is this going to say res?")
+                print("This",info)
                 next_node_info = self.graphs[0].get_node_info(node+1)['layer']
 
                 # Handle Attention Merging
-                if next_node_info != None and (self.graphs[0].modules['lin_attn'] in next_node_info):
+                if next_node_info != None and (self.graphs[0].modules['attn_o'] in next_node_info):
                     layer_no = [int(i) for i in self.graphs[0].get_node_info(node+1)['layer'].split('.') if i.isdigit()][0]
                     if transform_fn.__name__ in ['match_tensors_permute'] and ignore_heads == False:
                         n_heads = self.graphs[0].num_heads
@@ -609,6 +616,9 @@ class ModelMerge(nn.Module):
                 # Handle FF
                 else:
                     # returns merge and unmerge matrixs
+                    print("Daniter: node: ", node)
+                    print("Daniter: prev_node_layer: ", prev_node_layer)
+                    print("Daniter: correlation matrix: ", correlation_matrix)
                     merge, unmerge, _, cost = transform_fn(reduce_ratio, print_costs=print_costs, no_absval=no_absval, 
                                                         correlation_matrix=correlation_matrix,**kwargs)
                     merge = merge * len(self.graphs) 
@@ -961,7 +971,7 @@ class ModelMerge(nn.Module):
                                 metric_classes=metric_classes, 
                                 sentence_level=sentence_level,
                                 special_toks=special_toks,
-                                print_featnorms=True)
+                                print_featnorms=False)
 
         _, _, cost_dict = self.compute_transformations(transform_fn, reduce_ratio=1 - 1. / len(self.graphs),
                                     permute_heads=permute_heads,

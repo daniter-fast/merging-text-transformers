@@ -50,5 +50,6 @@ if __name__ == '__main__':
     model3.eval()
 
     # TODO: seq length currently is 8 instead of 10 because it is stripping some padding stuff that needs to be fixed
-    merge.transform(model3, dataloader, transform_fn=match_tensors_permute)
+    merge.transform(model3, dataloader, transform_fn=match_tensors_permute, special_toks=True, res_type='first')
     # metric calculation is broken. Need to read paper.
+    # TODO: using res_type='first' but should explore all and sep. Not sure what sep does.
