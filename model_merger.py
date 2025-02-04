@@ -247,6 +247,8 @@ class ModelMerge(nn.Module):
                 special_cases_names = ['q', 'k']
                 special_cases_nodes = [self.graphs[0].modules[name] for name in special_cases_names]
                 qk_nodes = [self.graphs[0].modules[name] for name in ['q', 'k']]
+
+                print("Daniter: metrics: ", list(self.metrics.keys()))
                 
                 for node, node_metrics in self.metrics.items():
                     if isinstance(node, int):
@@ -261,6 +263,7 @@ class ModelMerge(nn.Module):
                         elif contains_name(prev_node_layer, qk_nodes):
                             layer_no = [int(i) for i in self.graphs[0].get_node_info(node-1)['layer'].split('.') if i.isdigit()][0]
                             if qk_flag:
+                                print("Daniter: Doing a qk metric")
                                 qk_metric = self.metrics[f'qk{layer_no}']
                             else:
                                 qk_metric = node_metrics
@@ -269,7 +272,10 @@ class ModelMerge(nn.Module):
                                     intermeds_float = self.sent_rep(intermediates, node, sentence_level, lens, special_toks)
                                 else:
                                     intermeds_float = [i[node].float().detach() for i in intermediates] # len = num_graphs
-                                metric.update(x.shape[0], *intermeds_float) 
+                                print("Daniter: Calculating metrics for node: ", node)
+                                print("Daniter: intermeds_float: ", [i.shape for i in intermeds_float])
+                                print(f"Daniter: prev_node_layer: {prev_node_layer}")
+                                metric.update(x.shape[0], *intermeds_float, grouped_kv=True if "k_proj" in prev_node_layer else False) 
 
         for node, node_metrics in self.metrics.items():
             if isinstance(node, int):
@@ -480,8 +486,6 @@ class ModelMerge(nn.Module):
     def compute_metric_corrs(self, nodes, res='first', no_corr=False, qk=False):
         corrs = {}
         resnodes, non_resnodes = self.separate_res_nodes(nodes)
-        print("Daniter: resnodes: ", resnodes)
-        print("Daniter: non_resnodes: ", non_resnodes)
         
         for node in tqdm(non_resnodes):
             corrs[node] = self.cov_to_corr(self.metrics[node]['covariance'], no_corr)
@@ -729,7 +733,7 @@ class ModelMerge(nn.Module):
                     for sum_pred in sum_preds:
                         info = merger.graph.get_node_info(sum_pred)
                         print("Daniter: q,k,v merging info: ", info)
-                        if info['type'] == NodeType.SUM:
+                        if info['type'] == NodeType.SUM: #TODO: I think this assumes that 2 sums in a row are always qk
                             if qk_flag == False:
                                 second_sum_preds = merger.graph.preds(sum_pred)
                                 # merge q & k 

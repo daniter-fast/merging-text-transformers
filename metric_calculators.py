@@ -27,6 +27,13 @@ class CovarianceMetric(MetricCalculator):
         self.bsz = None
     
     def update(self, batch_size, *feats, **aux_params):
+
+        grouped_kv = aux_params.get('grouped_kv', False)
+        if grouped_kv:
+            # there are 3 kv heads for 9 attention heads so they need to be repeated 3 times
+            # TODO: this is a hack-- set the group size as a parameter
+            feats = [f.repeat(3,1) for f in feats]
+
         feats = torch.cat(feats, dim=0) #[dim, num_elts]
         feats = torch.nan_to_num(feats, 0, 0, 0)
 
@@ -95,6 +102,11 @@ class MeanMetric(MetricCalculator):
         self.mean = None
     
     def update(self, batch_size, *feats, **aux_params):
+        grouped_kv = aux_params.get('grouped_kv', False)
+        if grouped_kv:
+            # there are 3 kv heads for 9 attention heads so they need to be repeated 3 times
+            # TODO: this is a hack-- set the group size as a parameter
+            feats = [f.repeat(3,1) for f in feats]
         feats = torch.cat(feats, dim=0)
         mean = feats.abs().mean(dim=1)
         if self.mean is None: 
