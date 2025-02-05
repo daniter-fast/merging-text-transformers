@@ -12,7 +12,7 @@ class TransformerEncoderGraph(BIGGraph):
     def __init__(self, model,
                  modules,
                  layer_name='layers', # for transformer
-                 enc_prefix='',
+                 enc_prefix='model',
                  merge_type='all',
                  num_layers=30, #smollm
                  num_heads=9, #smollm 
@@ -83,7 +83,7 @@ class TransformerEncoderGraph(BIGGraph):
         
         for layer_index in range(self.num_layers): # for graph visualization
         #for layer_index, layerblock in enumerate(self.get_module(name_prefix)):
-            source_node = self.add_layerblock_nodes(layer_prefix+f'.{layer_index}', source_node, merge_type)        
+            source_node = self.add_layerblock_nodes(f'{self.enc_prefix}.{layer_prefix}.{layer_index}', source_node, merge_type)        
         return source_node
 
     def graphify(self):

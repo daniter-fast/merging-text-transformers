@@ -680,14 +680,24 @@ class ModelMerge(nn.Module):
     def merge_node(self, node, merger):
         info = merger.graph.get_node_info(node)
         module = merger.graph.get_module(info['layer'])
-        module.weight.data = merger.merge @ module.weight.data
-        if hasattr(module, 'bias') and module.bias is not None:
-            module.bias.data = merger.merge @ module.bias.data
+        orig_shape = module.weight.data.shape
+        if merger.merge.shape[1] != module.weight.data.shape[0]:
+            # TODO: bias term is being ignored but it isn't used in LLAMA. Fix later.
+            tmp_weight_data = module.weight.data.repeat(merger.merge.shape[1] // module.weight.data.shape[0], 1)
+            module.weight.data = (merger.merge @ tmp_weight_data)[:module.weight.data.shape[0], :]
+        else:
+            module.weight.data = merger.merge @ module.weight.data
+            if hasattr(module, 'bias') and module.bias is not None:
+                module.bias.data = merger.merge @ module.bias.data
+        assert module.weight.data.shape == orig_shape
 
     def unmerge_node(self, node, merger):
         info = merger.graph.get_node_info(node)
         module = merger.graph.get_module(info['layer'])
+        orig_shape = module.weight.data.shape
+        print(f"Daniter: Unmerging shapes: module: {module.weight.data.shape}, merger: {merger.unmerge.shape}")
         module.weight.data  = module.weight @ merger.unmerge
+        assert module.weight.data.shape == orig_shape
         
     # adding custom transformations here, for more control
     def apply_transformations_custom(self, merge_cls=False):
