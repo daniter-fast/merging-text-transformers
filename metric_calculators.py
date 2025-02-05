@@ -56,6 +56,13 @@ class CovarianceMetric(MetricCalculator):
         self.num_updates +=1
 
     def finalize(self, numel, eps=1e-4, dot_prod=False, pca=False, scale_cov=False, normalize=False, print_featnorms=False):
+
+        if print_featnorms:
+            print("Daniter: outer shape: ", self.outer.shape)
+            print("Daniter: mean shape: ", self.mean.shape)
+            print("Daniter: sos shape: ", self.sos.shape)
+            print("Daniter: numel: ", numel)
+
         self.outer = self.outer.div(numel)
         self.mean  = self.mean.div(numel)
         self.sos = torch.sqrt(self.sos)
@@ -66,7 +73,7 @@ class CovarianceMetric(MetricCalculator):
             cov = self.outer #* scaling_factor
         else:
             # print number of positive values
-            if False: # debugging cov computation
+            if print_featnorms: # debugging cov computation
                 print("Daniter: Number of elements: ", self.outer.numel())
                 print("Daniter: Number of negative values outer: ", (self.outer < 0).sum().item())
                 print("Daniter: Number of negative values mean: ", (torch.outer(self.mean, self.mean) < 0).sum().item())

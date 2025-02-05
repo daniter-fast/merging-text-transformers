@@ -247,8 +247,6 @@ class ModelMerge(nn.Module):
                 special_cases_names = ['q', 'k']
                 special_cases_nodes = [self.graphs[0].modules[name] for name in special_cases_names]
                 qk_nodes = [self.graphs[0].modules[name] for name in ['q', 'k']]
-
-                print("Daniter: metrics: ", list(self.metrics.keys()))
                 
                 for node, node_metrics in self.metrics.items():
                     if isinstance(node, int):
@@ -259,11 +257,13 @@ class ModelMerge(nn.Module):
                                     intermeds_float = self.sent_rep(intermediates, node, sentence_level, lens, special_toks)
                                 else:
                                     intermeds_float = [i[node].float().detach() for i in intermediates] # len = num_graphs
+                                if node == 291:
+                                    print("Daniter: ********************Adding metric to node: ", node)
+                                    print("Daniter: intermeds_float: ", [i.shape for i in intermeds_float])
                                 metric.update(x.shape[0] , *intermeds_float) 
                         elif contains_name(prev_node_layer, qk_nodes):
                             layer_no = [int(i) for i in self.graphs[0].get_node_info(node-1)['layer'].split('.') if i.isdigit()][0]
                             if qk_flag:
-                                print("Daniter: Doing a qk metric")
                                 qk_metric = self.metrics[f'qk{layer_no}']
                             else:
                                 qk_metric = node_metrics
@@ -272,9 +272,6 @@ class ModelMerge(nn.Module):
                                     intermeds_float = self.sent_rep(intermediates, node, sentence_level, lens, special_toks)
                                 else:
                                     intermeds_float = [i[node].float().detach() for i in intermediates] # len = num_graphs
-                                print("Daniter: Calculating metrics for node: ", node)
-                                print("Daniter: intermeds_float: ", [i.shape for i in intermeds_float])
-                                print(f"Daniter: prev_node_layer: {prev_node_layer}")
                                 metric.update(x.shape[0], *intermeds_float, grouped_kv=True if "k_proj" in prev_node_layer else False) 
 
         for node, node_metrics in self.metrics.items():
@@ -698,7 +695,7 @@ class ModelMerge(nn.Module):
         print(f"Daniter: Unmerging shapes: module: {module.weight.data.shape}, merger: {merger.unmerge.shape}")
         module.weight.data  = module.weight @ merger.unmerge
         assert module.weight.data.shape == orig_shape
-        
+
     # adding custom transformations here, for more control
     def apply_transformations_custom(self, merge_cls=False):
         qk_flag = False
@@ -736,13 +733,12 @@ class ModelMerge(nn.Module):
                 info = merger.graph.get_node_info(preds[0])
                 # self attention merging, and self attention out unmerging 
                 if info['type'] == NodeType.SUM:
-                    print('merging MHA')
+                    # print('merging MHA')
                     # apply merges to k,q,v matrices
                     sum_preds = merger.graph.preds(preds[0])
                     # check if q,k junction or v matrix
                     for sum_pred in sum_preds:
                         info = merger.graph.get_node_info(sum_pred)
-                        print("Daniter: q,k,v merging info: ", info)
                         if info['type'] == NodeType.SUM: #TODO: I think this assumes that 2 sums in a row are always qk
                             if qk_flag == False:
                                 second_sum_preds = merger.graph.preds(sum_pred)
@@ -757,11 +753,10 @@ class ModelMerge(nn.Module):
                     succ = merger.graph.succs(node)[0]
                     self.unmerge_node(succ, merger)
                 elif contains_name(info['layer'], qk_nodes) and qk_flag == True:
-                    print('merging qk')
                     self.merge_node(preds[0], merger)
 
                 elif 'self_attn_layer_norm' in info['layer'] or 'attention.output.LayerNorm' in info['layer']:
-                    print('merging self-attn res')
+                    # print('merging self-attn res')
                     # apply merge to ln
                     module = merger.graph.get_module(info['layer'])
                     parameter_names = ['weight', 'bias']

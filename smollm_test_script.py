@@ -29,7 +29,7 @@ def make_graphified_models(model_name_list):
         # todo: add rotary embeddings
         # defaults merge the minimum so we need to add flags or change defaults
         # example = qk=True, merge_type='all', classifier=??
-        graph = TransformerEncoderGraph(deepcopy(model), modules=llama_modules, num_layers=12)
+        graph = TransformerEncoderGraph(deepcopy(model), modules=llama_modules, num_layers=30)
         graph = graph.graphify()
         models.append(graph)
     return models
@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     merge = ModelMerge(graph1, graph2, device="cpu")
 
-    num_test_ex = 1
+    num_test_ex = 2
     input_ids = torch.randint(0, 100, (num_test_ex, 10))
     lens = torch.tensor([10]*num_test_ex).unsqueeze(1)
     dataloader = DataLoader(TensorDataset(input_ids, lens), batch_size=1)
@@ -59,8 +59,7 @@ if __name__ == '__main__':
     # TODO: We need to change apply_transformation_custom() to handle up and gate proj in MLP
     # TODO: We didn't modify unmerger but it didn't throw any errors so leaving it for now.
     # TODO: Check all the cases in the apply_transformation_custom() function.
-    # TODO: Works without language model head. Need to fix that.
-    # TODO: Extend merge to be for all layers.
+    # TODO: Create dataloads for merging that uses real text data.
 
     tokenizer = AutoTokenizer.from_pretrained(model_name_list[0])
 
