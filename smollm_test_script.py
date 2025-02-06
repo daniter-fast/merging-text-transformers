@@ -73,6 +73,8 @@ if __name__ == '__main__':
     # TODO: We need to add a merge code for the LM head in apply_transformation_custom()
     # TODO: Below test shows that all weights have changed but there are special cases for LN, attention and LM Head in apply_transformation_custom()
     # that are not implemented so we need to debug if this behavior is correct.
+    # TODO: Try identity permutation
+    # TODO: Apply_transformation_custom() probably mishandles MLP layer
 
 
     # Check which weights were changed
