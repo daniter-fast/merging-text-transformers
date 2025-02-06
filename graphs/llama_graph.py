@@ -99,13 +99,16 @@ class TransformerEncoderGraph(BIGGraph):
 
         # after embedding, repeat LlamaDecoderLayer
         input_node = self.add_layer_nodes(f'{self.layer_name}', emb_node, self.merge_type)
-        input_node = self.add_nodes_from_sequence(self.enc_prefix, [modules['final_norm'], NodeType.POSTFIX], input_node)
+        input_node = self.add_nodes_from_sequence(self.enc_prefix, [NodeType.PREFIX, modules['final_norm']], input_node)
 
+        input_node = self.add_nodes_from_sequence("", [NodeType.PREFIX, modules['lm_head']], input_node)
+        output_node = self.create_node(node_type=NodeType.OUTPUT)
+        self.add_directed_edge(input_node, output_node)
         
         return self
         
         '''
-        BERT stuff. TODO: Figure out output layer if needed
+        BERT stuff
         # xformer layers -> dense -> layernorm -> output
         if self.name == 'bert' and self.classifier == False:
             dense_node = self.add_nodes_from_sequence(modules['head_pref'], ['transform.dense', 'transform.LayerNorm', NodeType.PREFIX, 'decoder'], input_node)

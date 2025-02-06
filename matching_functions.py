@@ -167,7 +167,7 @@ def match_tensors_permute_MHA(n_heads, permute_heads=False,
             head_perm = col_inds_storage[head_1][head_2]
             head_perms.append(torch.tensor(head_perm + query_size*head_2))
 
-    new_mat = torch.eye(Om, device=device)[torch.tensor(torch.cat(head_perms)).long().to(device)]
+    new_mat = torch.eye(Om, device=device)[torch.tensor(torch.cat(head_perms)).long().to(device)] # TODO: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
     mats.append(new_mat.T)
     
     unmerge_mats = mats

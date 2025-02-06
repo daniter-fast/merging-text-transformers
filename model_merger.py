@@ -257,9 +257,6 @@ class ModelMerge(nn.Module):
                                     intermeds_float = self.sent_rep(intermediates, node, sentence_level, lens, special_toks)
                                 else:
                                     intermeds_float = [i[node].float().detach() for i in intermediates] # len = num_graphs
-                                if node == 291:
-                                    print("Daniter: ********************Adding metric to node: ", node)
-                                    print("Daniter: intermeds_float: ", [i.shape for i in intermeds_float])
                                 metric.update(x.shape[0] , *intermeds_float) 
                         elif contains_name(prev_node_layer, qk_nodes):
                             layer_no = [int(i) for i in self.graphs[0].get_node_info(node-1)['layer'].split('.') if i.isdigit()][0]
@@ -540,14 +537,12 @@ class ModelMerge(nn.Module):
             corrs = self.compute_corrs(nodes, feats_0, feats_1, res=res)
         else:
             nodes = list(self.metrics.keys())
-            print("Daniter: nodes: ", nodes)
             qk_flag = False
             if self.graphs[0].qk == True:
                 qk_flag = True
                 for i in range(self.graphs[0].num_layers):
                     nodes.remove(f'qk{i}')
             nodes.sort()
-            print("Daniter: nodes filtered: ", nodes)
             print('computing corrs')
             corrs = self.compute_metric_corrs(nodes, res=res, no_corr=no_corr, qk=qk_flag)
 
@@ -560,18 +555,14 @@ class ModelMerge(nn.Module):
 
         last_node = nodes[-1]
         for node in tqdm(nodes, desc="Computing transformations: "):
-            print("Daniter: Main loop processing node: ", node)
             prev_node_layer = self.graphs[0].get_node_info(node-1)['layer']
             # skip metrics associated with residuals and qk if qk is true
             correlation_matrix = None
             if prev_node_layer == None or not contains_name(prev_node_layer,special_cases_nodes):
-                print(f"Daniter: node: {node} in case 1")
                 if node in corrs:
                     correlation_matrix = corrs[node]
 
                 info = self.graphs[0].get_node_info(node)
-                print("Is this going to say res?")
-                print("This",info)
                 next_node_info = self.graphs[0].get_node_info(node+1)['layer']
 
                 # Handle Attention Merging
@@ -617,9 +608,6 @@ class ModelMerge(nn.Module):
                 # Handle FF
                 else:
                     # returns merge and unmerge matrixs
-                    print("Daniter: node: ", node)
-                    print("Daniter: prev_node_layer: ", prev_node_layer)
-                    print("Daniter: correlation matrix: ", correlation_matrix)
                     merge, unmerge, _, cost = transform_fn(reduce_ratio, print_costs=print_costs, no_absval=no_absval, 
                                                         correlation_matrix=correlation_matrix,**kwargs)
                     merge = merge * len(self.graphs) 
@@ -627,16 +615,12 @@ class ModelMerge(nn.Module):
                     self.unmerges[node] = unmerge.chunk(len(self.graphs), dim=0)
             
             elif contains_name(prev_node_layer, qk_nodes):
-                print(f"Daniter: node: {node} in case 2 - skipping")
                 continue
                 # continuing because this is already handled in attention block
 
             # handle metrics associated with residuals here, other special cases
             else:
-                print(f"Daniter: node: {node} in case 3 - residual")
                 info = self.graphs[0].get_node_info(node)
-                print('res')
-                print(info)
                 if res == 'sep':
                     correlation_matrix = corrs[node]
                     merge, unmerge, _, cost = transform_fn(reduce_ratio, correlation_matrix=correlation_matrix, 
@@ -692,9 +676,8 @@ class ModelMerge(nn.Module):
         info = merger.graph.get_node_info(node)
         module = merger.graph.get_module(info['layer'])
         orig_shape = module.weight.data.shape
-        print(f"Daniter: Unmerging shapes: module: {module.weight.data.shape}, merger: {merger.unmerge.shape}")
         module.weight.data  = module.weight @ merger.unmerge
-        assert module.weight.data.shape == orig_shape
+        assert module.weight.data.shape == orig_shape # TODO: may want to remove assert if ratio is not .5
 
     # adding custom transformations here, for more control
     def apply_transformations_custom(self, merge_cls=False):
@@ -721,7 +704,6 @@ class ModelMerge(nn.Module):
         graph_device = emb_copy_0.device
 
         for node in self.merges:
-            print("Daniter: Merging node: ", node)
             merges = self.merges[node]
             unmerges = self.unmerges[node]
             count = 0
@@ -853,7 +835,7 @@ class ModelMerge(nn.Module):
                     succ = merger.graph.succs(node)[0]
                     self.unmerge_node(succ, merger)
                 
-                elif 'transform.LayerNorm' in info['layer'] and merge_cls:
+                elif 'transform.LayerNorm' in info['layer'] and merge_cls: # TODO: Daniter: we probably need to add a merge code for the LM head
                     if final_merger == None and count == 1: # count ensures this is 2nd model merger being saved
                         final_merger = merger
 
@@ -905,7 +887,7 @@ class ModelMerge(nn.Module):
                             'classifier.bias']
                 #excluded = []
             else:
-                excluded = []
+                excluded = [] # TODO: daniter Should we add lm_head?
             state_dict = {}
             merged_state_dict1 = self.graphs[0].model.state_dict().copy()
             keys1 = list(self.graphs[0].model.state_dict().keys())

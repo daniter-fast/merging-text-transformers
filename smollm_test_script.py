@@ -18,7 +18,8 @@ llama_modules = {"emb": "embed_tokens",
                 'up_proj': 'mlp.up_proj',
                 'gate_proj': 'mlp.gate_proj',
                 'down_proj': 'mlp.down_proj',
-                'final_norm': 'norm'}
+                'final_norm': 'norm',
+                'lm_head': 'lm_head'}
 
 
 def make_graphified_models(model_name_list):
@@ -60,7 +61,8 @@ if __name__ == '__main__':
     # TODO: We didn't modify unmerger but it didn't throw any errors so leaving it for now.
     # TODO: Check all the cases in the apply_transformation_custom() function.
     # TODO: Create dataloads for merging that uses real text data.
-
+    # TODO: Daniter: We need to add a merge code for the LM head in apply_transformation_custom()
+    
     tokenizer = AutoTokenizer.from_pretrained(model_name_list[0])
 
     # Define prompt
