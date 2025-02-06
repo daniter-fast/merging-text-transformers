@@ -18,7 +18,8 @@ class TransformerEncoderGraph(BIGGraph):
                  num_heads=9, #smollm 
                  qk=True,
                  name='llama',
-                 classifier=False):
+                 classifier=False,
+                 add_lm_head=True):
         super().__init__(model)
         
         self.layer_name = layer_name
@@ -30,7 +31,7 @@ class TransformerEncoderGraph(BIGGraph):
         self.qk = qk
         self.name = name
         self.classifier = classifier 
-
+        self.add_lm_head = add_lm_head
 
     def add_layerblock_nodes(self, name_prefix, input_node, merge_type):
         # first half
@@ -99,11 +100,14 @@ class TransformerEncoderGraph(BIGGraph):
 
         # after embedding, repeat LlamaDecoderLayer
         input_node = self.add_layer_nodes(f'{self.layer_name}', emb_node, self.merge_type)
-        input_node = self.add_nodes_from_sequence(self.enc_prefix, [NodeType.PREFIX, modules['final_norm']], input_node)
+        if self.add_lm_head:
+            input_node = self.add_nodes_from_sequence(self.enc_prefix, [NodeType.PREFIX, modules['final_norm']], input_node)
 
-        input_node = self.add_nodes_from_sequence("", [NodeType.PREFIX, modules['lm_head']], input_node)
-        output_node = self.create_node(node_type=NodeType.OUTPUT)
-        self.add_directed_edge(input_node, output_node)
+            input_node = self.add_nodes_from_sequence("", [NodeType.PREFIX, modules['lm_head']], input_node)
+            output_node = self.create_node(node_type=NodeType.OUTPUT)
+            self.add_directed_edge(input_node, output_node)
+        else:
+            input_node = self.add_nodes_from_sequence(self.enc_prefix, [modules['final_norm'], NodeType.POSTFIX], input_node)
         
         return self
         
