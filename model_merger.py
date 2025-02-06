@@ -887,13 +887,14 @@ class ModelMerge(nn.Module):
                             'classifier.bias']
                 #excluded = []
             else:
-                excluded = [] # TODO: daniter Should we add lm_head?
+                excluded = [] 
             state_dict = {}
             merged_state_dict1 = self.graphs[0].model.state_dict().copy()
             keys1 = list(self.graphs[0].model.state_dict().keys())
             merged_state_dict2 = self.graphs[1].model.state_dict().copy()
             keys2 = list(self.graphs[1].model.state_dict().keys())
             for key in keys1:
+                print(key)
                 param = self.graphs[0].model.state_dict()[key]
                 if key in keys2 and param.shape == merged_state_dict2[key].shape and key not in excluded:
                     merged_state_dict1[key] = sum(graph.model.state_dict()[key] for graph in self.graphs) / len(self.graphs)
@@ -915,6 +916,9 @@ class ModelMerge(nn.Module):
             try:
                 for key in keys:
                     if key in merged_state_dict:
+                        # if key == 'lm_head.weight': # TODO: daniter Should we add lm_head?
+                        #     state_dict[key] = merged_state_dict[key]
+                        #     continue
                         param = self.graphs[0].model.state_dict()[key]
                         if interp_w is not None and param.shape == merged_state_dict[key].shape:
                             new_value = sum(graph.model.state_dict()[key] * w for graph, w in zip(self.graphs, interp_w))
