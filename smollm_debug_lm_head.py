@@ -53,7 +53,7 @@ if __name__ == '__main__':
         lens = torch.tensor([input_ids.shape[1]]*num_test_ex).unsqueeze(1)
         dataloader = DataLoader(TensorDataset(input_ids, lens), batch_size=1)
 
-    for num_layers in [30]:#, 4, 8, 15, 25, 30]:
+    for num_layers in [1]:#, 4, 8, 15, 25, 30]:
         graph1, graph2 = make_graphified_models(model_name_list, num_layers, args.add_head)
         merge = ModelMerge(graph1, graph2, device="cpu")
 

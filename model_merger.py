@@ -386,6 +386,7 @@ class ModelMerge(nn.Module):
         return corr
 
     def separate_res_nodes(self, nodes):
+        # TODO: Reimplement this for LLaMA
         resnodes = []
         non_resnodes = []
         for node in nodes:
@@ -703,7 +704,12 @@ class ModelMerge(nn.Module):
         final_merger = None
         graph_device = emb_copy_0.device
 
+        print("DANITER: merging nodes")
         for node in self.merges:
+            print(node)
+        print("########################")
+        for node in self.merges:
+            print("DANITER: merging node", node)
             merges = self.merges[node]
             unmerges = self.unmerges[node]
             count = 0
@@ -713,6 +719,7 @@ class ModelMerge(nn.Module):
                 merger.unmerge = merger.unmerge.to(graph_device)
                 preds = merger.graph.preds(node)
                 info = merger.graph.get_node_info(preds[0])
+                print("DANITER: \t info", info['layer'])
                 # self attention merging, and self attention out unmerging 
                 if info['type'] == NodeType.SUM:
                     # print('merging MHA')
@@ -790,7 +797,7 @@ class ModelMerge(nn.Module):
                         emb = merger.graph.get_module(emb_name)
                         emb_pos = merger.graph.get_module(emb_pos_name)
                         emb.weight.data = (merger.merge @ (emb.weight).T).T
-                        emb_pos.weight.data = (merger.merge @ (emb_pos.weight).T).T 
+                        emb_pos.weight.data = (merger.merge @ (emb_pos.weight).T).T  # TODO: Daniter: figure out Rope Embedding
 
                     # this unmerges w_k, w_q, w_v
                     succs = merger.graph.succs(node)
@@ -916,9 +923,6 @@ class ModelMerge(nn.Module):
             try:
                 for key in keys:
                     if key in merged_state_dict:
-                        # if key == 'lm_head.weight': # TODO: daniter Should we add lm_head?
-                        #     state_dict[key] = merged_state_dict[key]
-                        #     continue
                         param = self.graphs[0].model.state_dict()[key]
                         if interp_w is not None and param.shape == merged_state_dict[key].shape:
                             new_value = sum(graph.model.state_dict()[key] * w for graph, w in zip(self.graphs, interp_w))
