@@ -680,6 +680,20 @@ class ModelMerge(nn.Module):
         module.weight.data  = module.weight @ merger.unmerge
         assert module.weight.data.shape == orig_shape # TODO: may want to remove assert if ratio is not .5
 
+
+    def apply_transformations_llama(self, merge_cls=False):
+        qk_flag = False
+        if self.graphs[0].qk == True:
+            qk_flag = True
+        qk_nodes = [self.graphs[0].modules[name] for name in ['q', 'k']]
+
+        print("DANITER: merging nodes")
+        for node in self.merges:
+            print(node)
+        print("########################")
+        exit(-1)
+
+
     # adding custom transformations here, for more control
     def apply_transformations_custom(self, merge_cls=False):
         qk_flag = False
@@ -991,7 +1005,10 @@ class ModelMerge(nn.Module):
                                     **transform_kwargs
                                     )
 
-        final_merger = self.apply_transformations_custom(merge_cls=merge_cls)
+        if self.graphs[0].name == 'llama':
+            final_merger = self.apply_transformations_llama(merge_cls=merge_cls)
+        else:
+            final_merger = self.apply_transformations_custom(merge_cls=merge_cls)
 
         if save_both:
             merged_dicts = self.get_merged_state_dict(save_both=True)

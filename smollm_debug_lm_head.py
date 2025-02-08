@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
         model3 = AutoModelForCausalLM.from_pretrained(model_name_list[0])
         model3.eval()
-        merge.transform(model3, dataloader, transform_fn=match_tensors_permute, special_toks=True, res_type='first')
+        merge.transform(model3, dataloader, transform_fn=match_tensors_permute, special_toks=True, res_type='first', permute_heads=True)
 
         with torch.no_grad():
             inputs = tokenizer(test_text, return_tensors='pt')

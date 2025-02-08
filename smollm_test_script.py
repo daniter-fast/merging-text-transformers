@@ -75,6 +75,8 @@ if __name__ == '__main__':
     # that are not implemented so we need to debug if this behavior is correct.
     # TODO: Try identity permutation
     # TODO: Apply_transformation_custom() definitely mishandles MLP layer
+    # TODO: RoPE embeddings have a non-trivial change in the embeddings, and permutation may break it.
+    # TODO: Enable permuting of MHA heads
 
 
     # Check which weights were changed
