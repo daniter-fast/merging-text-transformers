@@ -691,7 +691,75 @@ class ModelMerge(nn.Module):
         for node in self.merges:
             print(node)
         print("########################")
-        exit(-1)
+
+        # Get all nodes in topological order for each graph
+        for graph in self.graphs:
+            # Get topological ordering of nodes
+            nodes_topo = list(nx.topological_sort(graph.G))
+            
+            # Iterate through nodes in topological order
+            for node in nodes_topo:
+                node_info = graph.get_node_info(node)
+                
+                # Skip if not a module node
+                if node_info['type'] != NodeType.MODULE:
+                    continue
+                    
+                # Find previous merge node by traversing predecessors
+                prev_merge_node = None
+                nodes_to_check = graph.preds(node)
+                checked_nodes = set()
+                
+                while nodes_to_check:
+                    curr = nodes_to_check.pop(0)
+                    if curr in checked_nodes:
+                        continue
+                    checked_nodes.add(curr)
+                    
+                    if curr in self.merges:
+                        prev_merge_node = curr
+                        break
+                        
+                    # Add predecessors to check
+                    nodes_to_check.extend(graph.preds(curr))
+                
+                # Find next merge node by traversing successors 
+                next_merge_node = None
+                nodes_to_check = graph.succs(node)
+                checked_nodes = set()
+                
+                while nodes_to_check:
+                    curr = nodes_to_check.pop(0)
+                    if curr in checked_nodes:
+                        continue
+                    checked_nodes.add(curr)
+                    
+                    if curr in self.merges:
+                        next_merge_node = curr
+                        break
+                        
+                    # Add successors to check
+                    nodes_to_check.extend(graph.succs(curr))
+                
+                # TODO: Handle case where next_merge_node is None
+                    
+                # Get module class name
+                module = graph.get_module(node_info['layer'])
+                module_class = module.__class__.__name__
+                
+                # Create merge handler
+                merger = MergeHandler(graph, 
+                                    None if prev_merge_node is None else self.merges[prev_merge_node][0],
+                                    self.unmerges[next_merge_node][0], 
+                                    node)
+                
+                # For LayerNorm, only merge
+                if prev_merge_node is None or 'LayerNorm' in module_class or 'RMSNorm' in module_class:
+                    self.merge_node(node, merger)
+                # For other modules, merge and unmerge
+                else:
+                    self.merge_node(node, merger)
+                    self.unmerge_node(node, merger)
 
 
     # adding custom transformations here, for more control
