@@ -689,11 +689,6 @@ class ModelMerge(nn.Module):
             qk_flag = True
         qk_nodes = [self.graphs[0].modules[name] for name in ['q', 'k']]
 
-        print("DANITER: merging nodes")
-        for node in self.merges:
-            print(node)
-        print("########################")
-
         # Get all nodes in topological order for each graph
         for graph in self.graphs:
             # Get topological ordering of nodes
@@ -764,13 +759,6 @@ class ModelMerge(nn.Module):
                                     self.merges[first_res_merge_node][0] if next_merge_node is None else self.merges[next_merge_node][0],
                                     None if prev_merge_node is None else self.unmerges[prev_merge_node][0],
                                     node)
-
-                # # Skip embedding layers
-                # if 'emb' in node_info['layer']:
-                #     info = merger.graph.get_node_info(node)
-                #     module = merger.graph.get_module(info['layer'])
-                #     module.weight.data = (merger.merge @ (module.weight).T).T
-                #     continue
 
                 # For LayerNorm, only merge
                 if prev_merge_node is None or 'LayerNorm' in module_class or 'RMSNorm' in module_class: # TODO: Use layer name istead
@@ -1093,6 +1081,7 @@ class ModelMerge(nn.Module):
                                     )
 
         if self.graphs[0].name == 'llama':
+            print("Applying transformations for Llama")
             final_merger = self.apply_transformations_llama(merge_cls=merge_cls)
         else:
             final_merger = self.apply_transformations_custom(merge_cls=merge_cls)

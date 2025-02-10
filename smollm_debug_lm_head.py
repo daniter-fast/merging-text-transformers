@@ -34,6 +34,8 @@ if __name__ == '__main__':
     parser.add_argument("--input_type", type=str, choices=["random", "text"], default="text")
     parser.add_argument("--no-add_head", dest="add_head", action="store_false", default=True,
                    help="Enabled by default, disable with --no-add_head") 
+    parser.add_argument("--test_parameter_change", action="store_true", default=False,
+                   help="Test if parameters changed")
     args = parser.parse_args()
     
 
@@ -59,8 +61,20 @@ if __name__ == '__main__':
 
         model3 = AutoModelForCausalLM.from_pretrained(model_name_list[0])
         model3.eval()
+
+        if args.test_parameter_change:
+            weight_norms = {}
+            for name, param in model3.named_parameters():
+                weight_norms[name] = param.data.norm().item()
+
         merge.transform(model3, dataloader, transform_fn=match_tensors_permute, special_toks=True, res_type='first', permute_heads=False)
         # TODO: test permute heads = True
+
+        if args.test_parameter_change:
+            # Check which weights were changed
+            for name, param in model3.named_parameters():
+                if weight_norms[name] == param.data.norm().item():
+                    print(f"##### Uh oh! {name} not changed")
 
         with torch.no_grad():
             inputs = tokenizer(test_text, return_tensors='pt')
