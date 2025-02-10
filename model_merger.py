@@ -8,6 +8,8 @@ from tqdm import tqdm
 from collections import defaultdict
 from copy import deepcopy
 from torch import nn
+import networkx as nx
+
 
 from graphs.base_graph import NodeType
 from metric_calculators import CovarianceMetric, MeanMetric
@@ -698,7 +700,15 @@ class ModelMerge(nn.Module):
             nodes_topo = list(nx.topological_sort(graph.G))
             
             # Iterate through nodes in topological order
+            first_res_merge_node = None
             for node in nodes_topo:
+                #print("Merging node", node)
+                info = graph.get_node_info(node)
+                # print(node, "info", graph.get_node_info(node))
+                # Skipping lm_head because these weights are shared with embedding layer
+                if info['layer'] == 'lm_head':
+                    continue
+
                 node_info = graph.get_node_info(node)
                 
                 # Skip if not a module node
@@ -716,7 +726,7 @@ class ModelMerge(nn.Module):
                         continue
                     checked_nodes.add(curr)
                     
-                    if curr in self.merges:
+                    if curr in self.unmerges:
                         prev_merge_node = curr
                         break
                         
@@ -742,6 +752,8 @@ class ModelMerge(nn.Module):
                     nodes_to_check.extend(graph.succs(curr))
                 
                 # TODO: Handle case where next_merge_node is None
+                if first_res_merge_node is None:
+                    first_res_merge_node = next_merge_node
                     
                 # Get module class name
                 module = graph.get_module(node_info['layer'])
@@ -749,12 +761,19 @@ class ModelMerge(nn.Module):
                 
                 # Create merge handler
                 merger = MergeHandler(graph, 
-                                    None if prev_merge_node is None else self.merges[prev_merge_node][0],
-                                    self.unmerges[next_merge_node][0], 
+                                    self.merges[first_res_merge_node][0] if next_merge_node is None else self.merges[next_merge_node][0],
+                                    None if prev_merge_node is None else self.unmerges[prev_merge_node][0],
                                     node)
-                
+
+                # # Skip embedding layers
+                # if 'emb' in node_info['layer']:
+                #     info = merger.graph.get_node_info(node)
+                #     module = merger.graph.get_module(info['layer'])
+                #     module.weight.data = (merger.merge @ (module.weight).T).T
+                #     continue
+
                 # For LayerNorm, only merge
-                if prev_merge_node is None or 'LayerNorm' in module_class or 'RMSNorm' in module_class:
+                if prev_merge_node is None or 'LayerNorm' in module_class or 'RMSNorm' in module_class: # TODO: Use layer name istead
                     self.merge_node(node, merger)
                 # For other modules, merge and unmerge
                 else:
