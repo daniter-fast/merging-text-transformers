@@ -7,7 +7,7 @@ from copy import deepcopy
 from graphs.llama_graph import TransformerEncoderGraph
 from smollm_test_script import llama_modules
 import argparse
-
+import numpy as np
 # Test perplexity of each model
 test_text = """Here's a function to compute the perplexity or loss of the generated output using a language model. 
 This function assumes that you have a trained language model that can return log probabilities for a given sequence. 
@@ -36,6 +36,8 @@ if __name__ == '__main__':
                    help="Enabled by default, disable with --no-add_head") 
     parser.add_argument("--test_parameter_change", action="store_true", default=False,
                    help="Test if parameters changed")
+    parser.add_argument("--test_base_loss", action="store_true", default=False,
+                   help="Test base loss")
     args = parser.parse_args()
     
 
@@ -55,12 +57,20 @@ if __name__ == '__main__':
         lens = torch.tensor([input_ids.shape[1]]*num_test_ex).unsqueeze(1)
         dataloader = DataLoader(TensorDataset(input_ids, lens), batch_size=1)
 
-    for num_layers in [30]:#, 4, 8, 15, 25, 30]:
+    for num_layers in [1, 4, 8, 15, 25, 30]:
         graph1, graph2 = make_graphified_models(model_name_list, num_layers, args.add_head)
         merge = ModelMerge(graph1, graph2, device="cpu")
 
         model3 = AutoModelForCausalLM.from_pretrained(model_name_list[0])
         model3.eval()
+
+        if args.test_base_loss:
+            inputs = tokenizer(test_text, return_tensors='pt')
+            input_ids = inputs['input_ids'].to(model3.device)
+            outputs = model3(input_ids, labels=input_ids)
+            loss = outputs.loss
+            print(f"Base Model Loss: {loss}")
+            exit()
 
         if args.test_parameter_change:
             weight_norms = {}
@@ -71,8 +81,10 @@ if __name__ == '__main__':
         # TODO: test permute heads = True
 
         if args.test_parameter_change:
+            print("Checking if parameters changed")
             # Check which weights were changed
             for name, param in model3.named_parameters():
+                #print((np.abs(weight_norms[name] - param.data.norm().item())) / weight_norms[name], name, weight_norms[name], param.data.norm().item())
                 if weight_norms[name] == param.data.norm().item():
                     print(f"##### Uh oh! {name} not changed")
 
@@ -86,7 +98,7 @@ if __name__ == '__main__':
             # sample decode
             prompt = "Once upon a time in a distant galaxy,"
             inputs = tokenizer(prompt, return_tensors="pt").to(model3.device)
-            output = model3.generate(**inputs, max_length=50, temperature=0.1, top_p=0.5)
+            output = model3.generate(**inputs, max_new_tokens=40)
             generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
             print(generated_text)
 

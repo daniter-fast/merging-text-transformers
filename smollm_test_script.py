@@ -76,6 +76,7 @@ if __name__ == '__main__':
     # TODO: Try identity permutation
     # TODO: Apply_transformation_custom() definitely mishandles MLP layer
     # TODO: RoPE embeddings have a non-trivial change in the embeddings, and permutation may break it.
+    # TODO: The merge is working and the correct layers are merged. But we need to write tests that the correct merges are used (ie. P_residual vs P_MHA where necessary)
     # TODO: Enable permuting of MHA heads
 
 

@@ -1009,8 +1009,16 @@ class ModelMerge(nn.Module):
             state_dict = {}
             merged_state_dict = self.merged_model.state_dict()
             keys = list(self.graphs[0].model.state_dict().keys())
+            graph_nodes = set()
+            for node in self.graphs[0].G.nodes():
+                node_info = self.graphs[0].get_node_info(node)
+                if node_info['type'] == NodeType.MODULE or node_info['type'] == NodeType.EMBEDDING:
+                    graph_nodes.add(node_info['layer'] + '.weight')
             try:
                 for key in keys:
+                    if key not in graph_nodes or "lm_head" in key: # Note: lm_head is tied to embedding so no need to merge twice
+                        # print("Skipping key: ", key)
+                        continue
                     if key in merged_state_dict:
                         param = self.graphs[0].model.state_dict()[key]
                         if interp_w is not None and param.shape == merged_state_dict[key].shape:
